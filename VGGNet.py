@@ -121,7 +121,7 @@ model.compile(loss=keras.losses.categorical_crossentropy, optimizer='adam', metr
 # End of model.
 
 # Batch size defined in article, with some epoch number. Number of classes defined by CIFAR-10.
-EPOCHS = 100
+EPOCHS = 500
 BS = 256
 num_classes=10
 
