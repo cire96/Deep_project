@@ -94,7 +94,7 @@ if __name__ == "__main__":
     model=keras.Model(inputs,x)
     model.compile(loss=keras.losses.categorical_crossentropy, optimizer='adam', metrics=['accuracy'])
 
-    EPOCHS = 2
+    EPOCHS = 500
     BS = 256
     num_classes=10
 
@@ -109,5 +109,22 @@ if __name__ == "__main__":
     history = model.fit(train_datagen.flow(x_train, y_train, batch_size=BS),
         validation_data=test_datagen.flow(x_test, y_test, batch_size=BS),
         steps_per_epoch=len(x_train) // BS, epochs=EPOCHS)
+
+    # Plot the accuracy for training and test set over the epochs.
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='best')
+    plt.show()
+    # Plot the loss for training and test set over the epochs.
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='best')
+    plt.show()
     
 

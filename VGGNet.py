@@ -1,4 +1,4 @@
-# E-Level + some sofistucated data augumentation
+# E-Level + some sophisticated data augumentation
 
 import tensorflow as tf
 from tensorflow import keras
