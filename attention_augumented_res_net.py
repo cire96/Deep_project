@@ -6,6 +6,7 @@ from tensorflow.keras.models import Sequential,Model
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, GlobalAveragePooling2D
 from tensorflow.keras.layers import BatchNormalization, Dropout, Activation, Add, Input
 from tensorflow.keras import regularizers
+from Attention_augumentation import *
 
 def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     '''x = model.add(Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data))
@@ -21,13 +22,23 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     x = model.add(Activation('relu')(x))
     
     return x'''
+    #ip = Input(shape=(32, 32, 3))
+    x = augmented_conv2d(input_Data, filters=n_Filter, kernel_size=conv_Size,
+                         depth_k=0.2, depth_v=0.2,  # dk/v (0.2) * f_out (20) = 4
+                         num_heads=4, strides=(conv_Stride,conv_Stride), relative_encodings=True,
+                         activation='relu', padding='same')
+    
+    #x = Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data)
+    
+    x = BatchNormalization()(x)
+    #x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
+    x = augmented_conv2d(x, filters=n_Filter, kernel_size=conv_Size, activation=None, padding='same',
+                         num_heads=4, relative_encodings=True)
+    x = BatchNormalization()(x)
 
-    x = Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data)
-    x = BatchNormalization()(x)
-    x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
-    x = BatchNormalization()(x)
     if conv_Stride != 1:
         input_Data=Conv2D(filters=n_Filter,kernel_size=(1,1),strides=(conv_Stride,conv_Stride),padding='same')(input_Data)
+        #augumented?
         input_Data=BatchNormalization()(input_Data)
 
     x = Add()([x, input_Data])
@@ -36,8 +47,7 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
 
     return x
 
-
-if __name__ == "__main__":
+def main():
     # A ImageDataGenerator allowing dynamic data augmentation.
     # Data augmentation includes rescaling the images, normalising the data, rotation of images, shifting images, and zooming.
     # Zoom range and fill mode are new
@@ -57,19 +67,20 @@ if __name__ == "__main__":
         rescale=1./255,
         samplewise_center=True,
         samplewise_std_normalization=True)
-    
-
 
     # Simplified VGGNet without any residuals:
     lamda = 5e-4 # The parameter for weight decay regularisation
 
     inputs = Input(shape=(32, 32, 3))
-    x=Conv2D(64, (7, 7), strides=(2,2), activation='relu', input_shape=(32, 32, 3), padding = 'same' )(inputs)
+    #x=Conv2D(64, (7, 7), strides=(2,2), activation='relu', input_shape=(32, 32, 3), padding = 'same' )(inputs)
+    augmented_conv2d(inputs, filters=64, kernel_size=(7,7), strides=(2,2), activation='relu', padding='same',
+                         num_heads=4, relative_encodings=True)
     x=MaxPooling2D(pool_size = (3,3), strides=(2,2))(x)
     
+
     #Conv2
     for i in range(3):
-        x = res_net_block(x,64)
+        x = res_net_block(x,64) #change name later
 
     #Conv3
     x = res_net_block(x,128,conv_Stride=2)
@@ -125,4 +136,5 @@ if __name__ == "__main__":
     plt.legend(['train', 'test'], loc='best')
     plt.show()
     
-
+if __name__ == "__main__":
+    main()
