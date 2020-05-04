@@ -24,7 +24,7 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     return x'''
     #ip = Input(shape=(32, 32, 3))
     x = aug_atten_block(input_Data, filters=n_Filter, kernel_size=conv_Size,
-                         depth_k=0.2, depth_v=0.2,  # dk/v (0.2) * f_out (20) = 4
+                         depth_k=0.25, depth_v=0.25,  # dk/v (0.2) * f_out (20) = 4
                          num_heads=4, strides=(conv_Stride,conv_Stride), relative_encodings=True, padding='same')
 
     x = Activation('relu')(x)
@@ -33,7 +33,8 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     
     x = BatchNormalization()(x)
     #x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
-    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same',
+    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same', depth_k=0.25, depth_v=0.25, 
+    
                          num_heads=4, relative_encodings=True)
 
     #x = Activation('relu')(x)
