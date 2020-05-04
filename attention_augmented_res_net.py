@@ -106,7 +106,7 @@ def main():
     x=Dense(10, activation='softmax')(x)
 
     model=keras.Model(inputs,x)
-    model.compile(loss=keras.losses.categorical_crossentropy, optimizer='adam', metrics=['accuracy'])
+    model.compile(loss=keras.losses.categorical_crossentropy, optimizer='adam', metrics=['accuracy'],experimental_run_tf_function=False)
 
     EPOCHS = 500
     BS = 256
