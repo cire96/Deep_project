@@ -33,9 +33,7 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     
     x = BatchNormalization()(x)
     #x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
-    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same', depth_k=0.25, depth_v=0.25, 
-    
-                         num_heads=4, relative_encodings=True)
+    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same', depth_k=0.25, depth_v=0.25, num_heads=4, relative_encodings=True)
 
     #x = Activation('relu')(x)
     x = BatchNormalization()(x)
