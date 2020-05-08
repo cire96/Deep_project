@@ -1,3 +1,24 @@
+# C-Level implementation of ResNet, requiring custom layers.
+
+# 1. Changed up the data augmentation so that the normalisation of the data is done outside the generator.
+# 2. Changed the test data so that it is not created from the generator but is always the same.
+# 3. Added a schedule for reducing the learning rate, allowing for faster training convergence. (Test reduce on plateau)
+# 4. Batch size reduced (image from using 128).
+
+# Batch size 128:
+    # Convergence training accuracy: 0.8870
+    # Convergence training loss: 0.4157
+    # Convergence validation accuracy: 0.8579
+    # Convergence validation loss: 0.5375
+
+# Parameters:
+'''
+Total params: 21,315,082
+Trainable params: 21,298,186
+Non-trainable params: 16,896
+'''
+
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
@@ -9,22 +30,19 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau, LearningRateScheduler
 
-# 1. Changed up the data augmentation so that the normalisation of the data is done outside the generator.
-# 2. Changed the test data so that it is not created from the generator but is always the same.
-# 3. Added a schedule for reducing the learning rate, allowing for faster training convergence. (Test reduce on plateau)
-# 4. Batch size reduced (image from using 128).
+
 
 
 def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
 
     x = Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', 
-    padding='same',kernel_initializer='he_normal',kernel_regularizer=l2(1e-4))(input_Data)
+    padding='same',kernel_initializer='he_normal',kernel_regularizer=l2(5e-4))(input_Data)
     x = BatchNormalization()(x)
     x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
     x = BatchNormalization()(x)
     if conv_Stride != 1:
         input_Data=Conv2D(filters=n_Filter,kernel_size=(1,1),strides=(conv_Stride,conv_Stride),
-        padding='same',kernel_initializer='he_normal',kernel_regularizer=l2(1e-4))(input_Data)
+        padding='same',kernel_initializer='he_normal',kernel_regularizer=l2(5e-4))(input_Data)
         input_Data=BatchNormalization()(input_Data)
 
     x = Add()([x, input_Data])
@@ -97,7 +115,7 @@ if __name__ == "__main__":
 
     inputs = Input(shape=(32, 32, 3))
     x=Conv2D(64, (7, 7), strides=(2,2), activation='relu', input_shape=(32, 32, 3), padding = 'same',
-    kernel_initializer='he_normal',kernel_regularizer=l2(1e-4))(inputs)
+    kernel_initializer='he_normal',kernel_regularizer=l2(5e-4))(inputs)
     x=MaxPooling2D(pool_size = (3,3), strides=(2,2))(x)
     
     #Conv2
@@ -126,6 +144,8 @@ if __name__ == "__main__":
 
     model=keras.Model(inputs,x)
     model.compile(loss=keras.losses.categorical_crossentropy, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy'])
+
+    model.summary()
 
     EPOCHS = 200
     BS = 128

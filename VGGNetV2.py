@@ -12,8 +12,17 @@
     # Convergence validation accuracy: 0.8908
 
 # Batch size 128:
-    # Convergence training accuracy: 0.9204
-    # Convergence validation accuracy: 0.8908
+    # Convergence training accuracy: 0.9535
+    # Convergence training loss: 0.3515
+    # Convergence validation accuracy: 0.9003
+    # Convergence validation loss: 0.5753
+
+# Parameters:
+'''
+Total params: 16,890,186
+Trainable params: 16,873,546
+Non-trainable params: 16,640
+'''
 
 import tensorflow as tf
 from tensorflow import keras
@@ -83,7 +92,7 @@ if __name__=="__main__":
     model = Sequential()
 
     # Simplified VGGNet without any residuals:
-    lamda = 1e-4 # The parameter for weight decay regularisation.
+    lamda = 5e-4 # The parameter for weight decay regularisation.
 
     # Because the model is very deep, we apply batch normalisation and dropout, which seemed to improve generalisation.
 
@@ -135,6 +144,8 @@ if __name__=="__main__":
     model.add(Conv2D(512, (3, 3), activation='relu', padding = 'same', kernel_regularizer = regularizers.l2(lamda), kernel_initializer='he_normal'))
     model.add(BatchNormalization())
 
+    model.add(MaxPooling2D(pool_size = (2,2), strides=(2,2)))
+
     model.add(Conv2D(512, (3, 3), activation='relu', padding = 'same', kernel_regularizer = regularizers.l2(lamda), kernel_initializer='he_normal'))
     model.add(BatchNormalization())
     #model.add(Dropout(0.4))
@@ -158,7 +169,7 @@ if __name__=="__main__":
     model.compile(loss=keras.losses.categorical_crossentropy, optimizer= Adam(learning_rate=1e-3), metrics=['accuracy'])
     # End of model.
 
-    
+    model.summary()
 
     # Batch size defined in article, with some epoch number. Number of classes defined by CIFAR-10.
     EPOCHS = 200
