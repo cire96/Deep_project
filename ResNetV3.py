@@ -9,6 +9,10 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau, LearningRateScheduler
 
+# 1. Changed up the data augmentation so that the normalisation of the data is done outside the generator.
+# 2. Changed the test data so that it is not created from the generator but is always the same.
+# 3. Added a schedule for reducing the learning rate, allowing for faster training convergence. (Test reduce on plateau)
+# 4. Batch size reduced (image from using 128).
 
 
 def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
@@ -41,6 +45,8 @@ def lr_schedule(epoch): # Source, example of resnet / keras documentation
     # Returns
         lr (float32): learning rate
     """
+
+    '''
     lr = 1e-3
     if epoch > 170:
         lr *= 0.5e-3
@@ -50,6 +56,20 @@ def lr_schedule(epoch): # Source, example of resnet / keras documentation
         lr *= 1e-2
     elif epoch > 60:
         lr *= 1e-1
+    '''
+
+    lr = 1e-3
+    if epoch > 170:
+        lr *= 1e-4
+    elif epoch > 150:
+        lr *= 0.5e-3
+    elif epoch > 120:
+        lr *= 1e-3
+    elif epoch > 80:
+        lr *= 1e-2
+    elif epoch > 30:
+        lr *= 1e-1
+    
     print('Learning rate: ', lr)
     return lr
 
@@ -74,14 +94,6 @@ if __name__ == "__main__":
 
         # zca_whitening=True,
         # zca_epsilon = 1e-6,
-
-    # Same thing but for the test data. Only thing done here is normalising and rescaling.
-    test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
-        samplewise_center=False,
-        samplewise_std_normalization=False,
-        featurewise_center=True,
-        featurewise_std_normalization=True,
-        ) #rescale=1.0/255.0,
 
     inputs = Input(shape=(32, 32, 3))
     x=Conv2D(64, (7, 7), strides=(2,2), activation='relu', input_shape=(32, 32, 3), padding = 'same',
@@ -116,19 +128,19 @@ if __name__ == "__main__":
     model.compile(loss=keras.losses.categorical_crossentropy, optimizer=Adam(learning_rate=1e-3), metrics=['accuracy'])
 
     EPOCHS = 200
-    BS = 32
+    BS = 128
     num_classes=10
 
     lr_scheduler = LearningRateScheduler(lr_schedule)
 
     lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
-                               cooldown=0,
+                               cooldown=1,
                                patience=10,
                                verbose = 1,
                                min_lr=0.5e-8)
 
-    callbacks = [lr_reducer, lr_scheduler]
-    #callbacks = [lr_reducer]
+    #callbacks = [lr_reducer, lr_scheduler]
+    callbacks = [lr_reducer]
 
     # Download CIFAR-10 from keras. Only done once per machine.
     (x_train, y_train), (x_test, y_test) = keras.datasets.cifar10.load_data()
