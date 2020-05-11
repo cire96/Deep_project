@@ -8,6 +8,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, GlobalAveragePooling2D
 from tensorflow.keras.layers import BatchNormalization, Dropout, Activation, Add
 from tensorflow.keras import regularizers, initializers
+from tensorflow.keras.regularizers import l2
 
 
 class AttentionAugmentation2D(Layer):
@@ -227,7 +228,7 @@ class AttentionAugmentation2D(Layer):
 
 
 def aug_atten_block(ip, filters, kernel_size=(3, 3), strides=(1, 1),
-                    depth_k=0.2, depth_v=0.2, num_heads=8, relative_encodings=True, padding="same"):
+                    depth_k=0.25, depth_v=0.25, num_heads=4, relative_encodings=True, padding="same", reg = 5e-4):
 
     # input_shape = tensorflow.keras.int_shape(ip)
     channel_axis = 1 if tf.keras.backend.image_data_format() == 'channels_first' else -1
@@ -237,16 +238,16 @@ def aug_atten_block(ip, filters, kernel_size=(3, 3), strides=(1, 1),
     #conv_out = _conv_layer(filters - depth_v, kernel_size, strides, padding = padding)(ip)
 
     conv_out = Conv2D(filters - depth_v, kernel_size,
-                      strides=strides, padding=padding)(ip)
+                      strides=strides, padding=padding, kernel_regularizer=l2(reg), kernel_initializer='he_normal')(ip)
 
     # Augmented Attention Block
     #qkv_conv = _conv_layer(2 * depth_k + depth_v, (1, 1), strides)(ip)
     qkv_conv = Conv2D(2 * depth_k + depth_v, (1, 1),
-                      strides=strides, padding=padding)(ip)
+                      strides=strides, padding=padding,  kernel_regularizer=l2(reg), kernel_initializer='he_normal')(ip)
     attn_out = AttentionAugmentation2D(
         depth_k, depth_v, num_heads, relative_encodings)(qkv_conv)
     #attn_out = _conv_layer(depth_v, kernel_size=(1, 1))(attn_out)
-    attn_out = Conv2D(depth_v, kernel_size=(1, 1))(attn_out)
+    attn_out = Conv2D(depth_v, kernel_size=(1, 1),  kernel_regularizer=l2(reg), kernel_initializer='he_normal')(attn_out)
 
     output = concatenate([conv_out, attn_out], axis=channel_axis)
     output = BatchNormalization()(output)
