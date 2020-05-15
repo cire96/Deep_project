@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np

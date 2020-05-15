@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
@@ -11,54 +13,26 @@ from tensorflow.keras import regularizers, initializers
 from tensorflow.keras.regularizers import l2
 
 
-class AttentionAugmentation2D(Layer):
-    def __init__(self, depth_k, depth_v, num_heads, relative=True, **kwargs):
-        super(AttentionAugmentation2D, self).__init__(**kwargs)
-        # remove plz
-        '''
-        if depth_k % num_heads != 0:
-            raise ValueError('`depth_k` (%d) is not divisible by `num_heads` (%d)' % (
-                depth_k, num_heads))
-
-        if depth_v % num_heads != 0:
-            raise ValueError('`depth_v` (%d) is not divisible by `num_heads` (%d)' % (
-                depth_v, num_heads))
-
-        if depth_k // num_heads < 1.:
-            raise ValueError('depth_k / num_heads cannot be less than 1 ! '
-                             'Given depth_k = %d, num_heads = %d' % (
-                                 depth_k, num_heads))
-
-        if depth_v // num_heads < 1.:
-            raise ValueError('depth_v / num_heads cannot be less than 1 ! '
-                             'Given depth_v = %d, num_heads = %d' % (
-                                 depth_v, num_heads))
-        '''
-        
-        self.depth_k = depth_k
-        self.depth_v = depth_v
-        self.num_heads = num_heads
+class AttentionAugmentation(Layer):
+    def __init__(self, dk, dv, Nh, relative=True, **kwargs):
+        super(AttentionAugmentation, self).__init__(**kwargs)
+        self.dk = dk
+        self.dv = dv
+        self.Nh = Nh
         self.relative = relative
 
-        self.axis = 1 if tf.keras.backend.image_data_format() == 'channels_first' else -1
 
     def build(self, input_shape):
-        self._shape = input_shape
+        self.input_shape = input_shape
 
-        # normalize the format of depth_v and depth_k,
-        # dk!=k, dv!=v, to get the dk and dv "normalize" v and k
-        self.depth_k, self.depth_v = _normalize_depth_vars(
-            self.depth_k, self.depth_v, input_shape)
+        self.dk, self.dv = norm_dv(
+            self.dk, self.dv, input_shape)
 
-        # input_shape contains information about the channels, height, width
-        # remove first 3 lines (the reduntant stuff), (cifar-10 should have channels last)
-        if self.axis == 1:
-            _, channels, height, width = input_shape
-        else:
-            _, height, width, channels = input_shape
 
-        # if fuck happens this is why
-        dk_per_head = int(self.depth_k / self.num_heads)
+        _, height, width, channels = input_shape
+
+
+        dk_per_head = int(self.dk / self.Nh)
 
         if dk_per_head == 0:
             print('dk per head', dk_per_head)
@@ -76,37 +50,31 @@ class AttentionAugmentation2D(Layer):
                                                   stddev=dk_per_head ** -0.5))
 
     def call(self, inputs, **kwargs):
-        if self.axis == 1:
-            # If channels first, force it to be channels last for these ops
-            inputs = tf.keras.backend.permute_dimensions(
-                inputs, [0, 2, 3, 1])  # utan backend
 
         q, k, v = tf.split(
-            inputs, [self.depth_k, self.depth_k, self.depth_v], axis=-1)
+            inputs, [self.dk, self.dk, self.dv], axis=-1)
 
         q = self.split_heads_2d(q)
         k = self.split_heads_2d(k)
         v = self.split_heads_2d(v)
 
-        # scale query
-        depth_k_heads = self.depth_k / self.num_heads
-        q *= (depth_k_heads ** -0.5)  # scaled dot-product
 
-        # This part might be unneccessary, should perhaps be replaced with a function (flatten_hw)
-        # [Batch, num_heads, height * width, depth_k or depth_v] if axis == -1
-        qk_shape = [self._batch, self.num_heads, self._height *
-                    self._width, self.depth_k // self.num_heads]
-        v_shape = [self._batch, self.num_heads, self._height *
-                   self._width, self.depth_v // self.num_heads]
+        dk_heads = self.dk / self.Nh
+        q *= (dk_heads ** -0.5)  # scaled dot-product
+
+
+        qk_shape = [self.batch_num, self.Nh, self.height *
+                    self.width, self.dk // self.Nh]
+        v_shape = [self.batch_num, self.Nh, self.height *
+                   self.width, self.dv // self.Nh]
         flat_q = tf.keras.backend.reshape(
-            q, tf.keras.backend.stack(qk_shape))  # use numpy instead?
+            q, tf.keras.backend.stack(qk_shape)) 
         flat_k = tf.keras.backend.reshape(k, tf.keras.backend.stack(qk_shape))
         flat_v = tf.keras.backend.reshape(v, tf.keras.backend.stack(v_shape))
 
-        # [Batch, num_heads, HW, HW]
+
         logits = tf.matmul(flat_q, flat_k, transpose_b=True)
 
-        # Apply relative encodings
         h_rel_logits, w_rel_logits = self.relative_logits(q)
         logits += h_rel_logits
         logits += w_rel_logits
@@ -114,62 +82,56 @@ class AttentionAugmentation2D(Layer):
         weights = tf.keras.backend.softmax(logits, axis=-1)
         attn_out = tf.matmul(weights, flat_v)
 
-        #attn_out_shape = [self._batch, self.num_heads, self._height, self._width, self.depth_v // self.num_heads]
+
         attn_out_shape = tf.keras.backend.stack(
-            [self._batch, self.num_heads, self._height, self._width, self.depth_v // self.num_heads])
-        #attn_out = tensorflow.keras.reshape(attn_out, attn_out_shape)
+            [self.batch_num, self.Nh, self.height, self.width, self.dv // self.Nh])
+
         attn_out = self.combine_heads_2d(
             tf.keras.backend.reshape(attn_out, attn_out_shape))
-        # [batch, height, width, depth_v]
 
-        if self.axis == 1:
-            # return to [batch, depth_v, height, width] for channels first
-            attn_out = tf.keras.backend.permute_dimensions(attn_out, [0, 3, 1, 2])
 
-        attn_out.set_shape(self.compute_output_shape(self._shape))
+        attn_out.set_shape(self.compute_output_shape(self.input_shape))
 
         return attn_out
 
     def compute_output_shape(self, input_shape):
         output_shape = list(input_shape)
-        output_shape[self.axis] = self.depth_v
+        output_shape[-1] = self.dv
         return tuple(output_shape)
 
     def split_heads_2d(self, ip):
         tensor_shape = tf.keras.backend.shape(ip)
 
-        # batch, height, width, channels for axis = -1
-        tensor_shape = [tensor_shape[i] for i in range(len(self._shape))]
+        tensor_shape = [tensor_shape[i] for i in range(len(self.input_shape))]
 
         batch = tensor_shape[0]
         height = tensor_shape[1]
         width = tensor_shape[2]
         channels = tensor_shape[3]
 
-        # Save the spatial tensor dimensions
-        self._batch = batch
-        self._height = height
-        self._width = width
+        self.batch_num = batch
+        self.height = height
+        self.width = width
 
         ret_shape = tf.keras.backend.stack(
-            [batch, height, width,  self.num_heads, channels // self.num_heads])
+            [batch, height, width,  self.Nh, channels // self.Nh])
         split = tf.keras.backend.reshape(ip, ret_shape)
-        transpose_axes = (0, 3, 1, 2, 4)
-        split = tf.keras.backend.permute_dimensions(split, transpose_axes)
+
+        # Transpose axis from Attention Augmented Convolutional Networks article
+        axis_transpose = (0, 3, 1, 2, 4)
+        split = tf.keras.backend.permute_dimensions(split, axis_transpose)
 
         return split
 
     def relative_logits(self, q):
         shape = tf.keras.backend.shape(q)
-        # [batch, num_heads, H, W, depth_v]
         shape = [shape[i] for i in range(5)]
-
         height = shape[2]
         width = shape[3]
 
+        # Transpose mask and permutation from Attention Augmented Convolutional Networks article
         rel_logits_w = self.relative_logits_1d(q, self.key_relative_w, height, width,
                                                transpose_mask=[0, 1, 2, 4, 3, 5])
-
         rel_logits_h = self.relative_logits_1d(
             tf.keras.backend.permute_dimensions(q, [0, 1, 3, 2, 4]),
             self.key_relative_h, width, height,
@@ -180,15 +142,15 @@ class AttentionAugmentation2D(Layer):
     def relative_logits_1d(self, q, rel_k, H, W, transpose_mask):
         rel_logits = tf.einsum('bhxyd,md->bhxym', q, rel_k)
         rel_logits = tf.keras.backend.reshape(
-            rel_logits, [-1, self.num_heads * H, W, 2 * W - 1])
+            rel_logits, [-1, self.Nh * H, W, 2 * W - 1])
         rel_logits = self.rel_to_abs(rel_logits)
         rel_logits = tf.keras.backend.reshape(
-            rel_logits, [-1, self.num_heads, H, W, W])
+            rel_logits, [-1, self.Nh, H, W, W])
         rel_logits = tf.keras.backend.expand_dims(rel_logits, axis=3)
         rel_logits = tf.keras.backend.tile(rel_logits, [1, 1, 1, H, 1, 1])
         rel_logits = tf.keras.backend.permute_dimensions(rel_logits, transpose_mask)
         rel_logits = tf.keras.backend.reshape(
-            rel_logits, [-1, self.num_heads, H * W, H * W])
+            rel_logits, [-1, self.Nh, H * W, H * W])
         return rel_logits
 
     def rel_to_abs(self, x):
@@ -205,75 +167,37 @@ class AttentionAugmentation2D(Layer):
         return final_x
 
     def combine_heads_2d(self, inputs):
-        # [batch, num_heads, height, width, depth_v // num_heads]
+        # Transpose from Attention Augmented Convolutional Networks article
         transposed = tf.keras.backend.permute_dimensions(inputs, [0, 2, 3, 1, 4])
-        # [batch, height, width, num_heads, depth_v // num_heads]
         shape = tf.keras.backend.shape(transposed)
         shape = [shape[i] for i in range(5)]
 
         a, b = shape[-2:]
         ret_shape = tf.keras.backend.stack(shape[:-2] + [a * b])
-        # [batch, height, width, depth_v]
         return tf.keras.backend.reshape(transposed, ret_shape)
 
-    def get_config(self):
-        config = {
-            'depth_k': self.depth_k,
-            'depth_v': self.depth_v,
-            'num_heads': self.num_heads,
-            'relative': self.relative,
-        }
-        base_config = super(AttentionAugmentation2D, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
 
 
-def aug_atten_block(ip, filters, kernel_size=(3, 3), strides=(1, 1),
-                    depth_k=0.25, depth_v=0.25, num_heads=4, relative_encodings=True, padding="same", reg = 5e-4):
 
-    # input_shape = tensorflow.keras.int_shape(ip)
-    channel_axis = 1 if tf.keras.backend.image_data_format() == 'channels_first' else -1
+def aug_atten_block(ip, filters, kernel_size=(3, 3), strides=(1, 1),dk=0.25, dv=0.25, Nh=4, 
+                        relative_encodings=True, padding="same", reg = 5e-4):
 
-    depth_k, depth_v = _normalize_depth_vars(depth_k, depth_v, filters)
+    dk, dv = norm_dv(dk, dv, filters)
 
-    #conv_out = _conv_layer(filters - depth_v, kernel_size, strides, padding = padding)(ip)
-
-    conv_out = Conv2D(filters - depth_v, kernel_size,
+    conv_out = Conv2D(filters - dv, kernel_size,
                       strides=strides, padding=padding, kernel_regularizer=l2(reg), kernel_initializer='he_normal')(ip)
-
-    # Augmented Attention Block
-    #qkv_conv = _conv_layer(2 * depth_k + depth_v, (1, 1), strides)(ip)
-    qkv_conv = Conv2D(2 * depth_k + depth_v, (1, 1),
+    qkv_conv = Conv2D(2 * dk + dv, (1, 1),
                       strides=strides, padding=padding,  kernel_regularizer=l2(reg), kernel_initializer='he_normal')(ip)
-    attn_out = AttentionAugmentation2D(
-        depth_k, depth_v, num_heads, relative_encodings)(qkv_conv)
-    #attn_out = _conv_layer(depth_v, kernel_size=(1, 1))(attn_out)
-    attn_out = Conv2D(depth_v, kernel_size=(1, 1),  kernel_regularizer=l2(reg), kernel_initializer='he_normal')(attn_out)
+    attn_out = AttentionAugmentation(dk, dv, Nh, relative_encodings)(qkv_conv)
+    attn_out = Conv2D(dv, kernel_size=(1, 1),  kernel_regularizer=l2(reg), kernel_initializer='he_normal')(attn_out)
 
-    output = concatenate([conv_out, attn_out], axis=channel_axis)
+    output = concatenate([conv_out, attn_out], axis=-1)
     output = BatchNormalization()(output)
     return output
 
 
-def _normalize_depth_vars(depth_k, depth_v, filters):
-    """
-    Accepts depth_k and depth_v as either floats or integers
-    and normalizes them to integers.
-    Args:
-        depth_k: float or int.
-        depth_v: float or int.
-        filters: number of output filters.
-    Returns:
-        depth_k, depth_v as integers.
-    """
+def norm_dv(dk, dv, filters):
+    dk = int(filters * dk) if type(dk) == float else int(dk)
+    dv = int(filters * dv) if type(dv) == float else int(dv)
 
-    if type(depth_k) == float:
-        depth_k = int(filters * depth_k)
-    else:
-        depth_k = int(depth_k)
-
-    if type(depth_v) == float:
-        depth_v = int(filters * depth_v)
-    else:
-        depth_v = int(depth_v)
-
-    return depth_k, depth_v
+    return dk, dv

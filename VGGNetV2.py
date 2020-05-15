@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 # E-Level + some sophisticated data augumentation
 
 # Changes done from base VGGNet:

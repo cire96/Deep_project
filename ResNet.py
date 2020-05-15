@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
@@ -8,19 +10,6 @@ from tensorflow.keras.layers import BatchNormalization, Dropout, Activation, Add
 from tensorflow.keras import regularizers
 
 def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
-    '''x = model.add(Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data))
-    x = model.add(BatchNormalization())
-    x = model.add(Conv2D(n_Filter, conv_Size, activation=None, padding='same'))
-    x = model.add(BatchNormalization())
-
-    if conv_Stride != 1:
-        x=model.add(Conv2D(filters=n_Filter,kernel_size=(1,1),strides=(conv_Stride,conv_Stride)))
-        x=model.add(BatchNormalization())
-
-    x = model.add(Add()([x, input_Data]))
-    x = model.add(Activation('relu')(x))
-    
-    return x'''
 
     x = Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data)
     x = BatchNormalization()(x)

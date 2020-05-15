@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 import tensorflow as tf
 from tensorflow import keras
 import numpy as np
@@ -9,23 +11,10 @@ from tensorflow.keras import regularizers
 from attention_augmentation import *
 
 def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
-    '''x = model.add(Conv2D(n_Filter, conv_Size, strides=(conv_Stride,conv_Stride), activation='relu', padding='same')(input_Data))
-    x = model.add(BatchNormalization())
-    x = model.add(Conv2D(n_Filter, conv_Size, activation=None, padding='same'))
-    x = model.add(BatchNormalization())
-
-    if conv_Stride != 1:
-        x=model.add(Conv2D(filters=n_Filter,kernel_size=(1,1),strides=(conv_Stride,conv_Stride)))
-        x=model.add(BatchNormalization())
-
-    x = model.add(Add()([x, input_Data]))
-    x = model.add(Activation('relu')(x))
-    
-    return x'''
     #ip = Input(shape=(32, 32, 3))
     x = aug_atten_block(input_Data, filters=n_Filter, kernel_size=conv_Size,
-                         depth_k=0.25, depth_v=0.25,  # dk/v (0.2) * f_out (20) = 4
-                         num_heads=4, strides=(conv_Stride,conv_Stride), relative_encodings=True, padding='same')
+                         dk=0.25, dv=0.25,  # dk/v (0.2) * f_out (20) = 4
+                         Nh=4, strides=(conv_Stride,conv_Stride), relative_encodings=True, padding='same')
 
     x = Activation('relu')(x)
     
@@ -33,7 +22,7 @@ def res_net_block(input_Data, n_Filter, conv_Size=(3,3),conv_Stride=1):
     
     x = BatchNormalization()(x)
     #x = Conv2D(n_Filter, conv_Size, activation=None, padding='same')(x)
-    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same', depth_k=0.25, depth_v=0.25, num_heads=4, relative_encodings=True)
+    x = aug_atten_block(x, filters=n_Filter, kernel_size=conv_Size, padding='same', dk=0.25, dv=0.25, Nh=4, relative_encodings=True)
 
     #x = Activation('relu')(x)
     x = BatchNormalization()(x)
@@ -76,7 +65,7 @@ def main():
     inputs = Input(shape=(32, 32, 3))
     #x=Conv2D(64, (7, 7), strides=(2,2), activation='relu', input_shape=(32, 32, 3), padding = 'same' )(inputs)
     x = aug_atten_block(inputs, filters=64, kernel_size=(7,7), strides=(2,2), padding='same',
-                         num_heads=4, relative_encodings=True)
+                         Nh=4, relative_encodings=True)
 
     x = Activation('relu')(x)
     x = MaxPooling2D(pool_size = (3,3), strides=(2,2))(x)

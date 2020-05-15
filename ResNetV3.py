@@ -1,3 +1,5 @@
+# DD2424, Marcus Jirwe 960903, Eric Lind 961210, Matthew Norström 970313
+
 # C-Level implementation of ResNet, requiring custom layers.
 
 # 1. Changed up the data augmentation so that the normalisation of the data is done outside the generator.
